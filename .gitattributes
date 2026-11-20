@@ -1,2 +1,4 @@
 # Обёртки .cmd для двойного щелчка — с CRLF и в архиве релиза
 *.cmd text eol=crlf
+# Скриншоты и SECURITY.md нужны странице на GitHub, а не программе — в архив релиза не кладём
+.github export-ignore

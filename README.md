@@ -11,8 +11,8 @@ Claude Code и десктопный Claude ходят в сеть **только
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/menu-dark.png">
-    <img src="docs/menu-light.png" width="424" alt="Окно Claude kill-switch: защищено, Claude ходит в сеть только через VPN">
+    <source media="(prefers-color-scheme: dark)" srcset=".github/menu-dark.png">
+    <img src=".github/menu-light.png" width="424" alt="Окно Claude kill-switch: защищено, Claude ходит в сеть только через VPN">
   </picture>
 </p>
 
@@ -190,7 +190,7 @@ Claude Code и десктопный Claude ходят в сеть **только
 - `windows\killswitch.ps1` — само приложение: фоновый сторож с правилами брандмауэра, окно настроек,
   проверка обновлений. `windows\icon.ico` — его значок.
 - `.claude-plugin\`, `hooks\`, `types\` — плагин для Claude Code.
-- `docs\` — картинки для этой страницы.
+- `.github` — скриншоты для этой страницы и правила сообщений об уязвимостях (`SECURITY.md`).
 
 ## Лицензия
 
