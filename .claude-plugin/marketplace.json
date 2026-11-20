@@ -1,0 +1,12 @@
+{
+  "name": "claude-vpn-killswitch",
+  "description": "Claude VPN kill-switch: Claude ходит в сеть только через VPN",
+  "owner": { "name": "mrnikitavasilenko-del" },
+  "plugins": [
+    {
+      "name": "killswitch",
+      "source": "./",
+      "description": "Claude Code и десктопный Claude ходят в сеть только через VPN (Windows)"
+    }
+  ]
+}
