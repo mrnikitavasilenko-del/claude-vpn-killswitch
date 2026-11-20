@@ -4,6 +4,7 @@
 param([switch]$Uninstall)
 
 $TASK_NAME = 'Claude kill-switch'
+$UPDATE_TASK_NAME = 'Claude kill-switch update'
 $RULE_GROUP = 'Claude kill-switch'
 $installDir = "$env:ProgramFiles\ClaudeKillSwitch"
 # Сторож работает с правами администратора, поэтому лежит там, куда без админа не записать
@@ -40,6 +41,7 @@ Remove-Item "$stateDir\paused-until-reboot", "$stateDir\autostart-off", "$stateD
 
 if ($Uninstall) {
     Unregister-ScheduledTask -TaskName $TASK_NAME -Confirm:$false -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $UPDATE_TASK_NAME -Confirm:$false -ErrorAction SilentlyContinue
     Remove-NetFirewallRule -Group $RULE_GROUP -ErrorAction SilentlyContinue
     auditpol /set /subcategory:$FIREWALL_CONNECTION_AUDIT_GUID /failure:disable | Out-Null
     Remove-Item (@($installDir, $stateDir) + $menuShortcutPaths) -Recurse -Force -ErrorAction SilentlyContinue
@@ -73,6 +75,14 @@ $taskSettings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Ze
 Register-ScheduledTask -TaskName $TASK_NAME -Action $taskAction -Trigger $taskTrigger `
     -Principal $taskPrincipal -Settings $taskSettings -Force | Out-Null
 Start-ScheduledTask -TaskName $TASK_NAME
+
+# Задача обновления: без расписания, её запускает кнопка «Обновить». С правами администратора — поэтому без окна UAC,
+# а ставит она только последний релиз с GitHub. Перерегистрация во время обновления текущий запуск не обрывает (проверено)
+$updateTaskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "$watcherArgs -Update"
+$updateTaskSettings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries
+Register-ScheduledTask -TaskName $UPDATE_TASK_NAME -Action $updateTaskAction -Principal $taskPrincipal `
+    -Settings $updateTaskSettings -Force | Out-Null
 
 $shell = New-Object -ComObject WScript.Shell
 foreach ($menuShortcutPath in $menuShortcutPaths) {

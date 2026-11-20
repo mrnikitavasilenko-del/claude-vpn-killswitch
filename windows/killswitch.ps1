@@ -6,13 +6,14 @@
 #   окно UAC ждёт человека сколько угодно, а команда мода не может висеть.
 # С -Status — состояние текстом (для /killswitch status).
 # С -Status -Json — то же одной строкой JSON (для строки над полем ввода в Claude Code).
-# С -Update — скачать последний релиз с GitHub и запустить его install.ps1 (кнопка «Обновить» в окне).
+# С -Update — скачать последний релиз с GitHub и установить его. От администратора (задача «Claude kill-switch update»,
+#   её запускает кнопка «Обновить») — ставит сам; без прав — запускает эту задачу.
 # С -LoadOnly — только объявить функции (окно так загружает их в фоновый поток).
 param([switch]$Menu, [switch]$OpenMenu, [switch]$StartInstall, [switch]$Status, [switch]$Json, [switch]$Update, [switch]$LoadOnly)
 
 # Версия = тег релиза на GitHub без «v». Кнопка «Обновить» ставит только релизы. Плагин и /killswitch install
 # берут код из ветки main — поэтому в main только готовое к выпуску
-$VERSION = '0.3.0'
+$VERSION = '0.4.0'
 $GITHUB_REPO = 'mrnikitavasilenko-del/claude-vpn-killswitch'
 $LATEST_RELEASE_API_URL = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
 $LATEST_RELEASE_ZIP_URL = "https://github.com/$GITHUB_REPO/releases/latest/download/claude-vpn-killswitch.zip"
@@ -24,6 +25,8 @@ $UPDATE_CHECK_TIMEOUT_S = 10
 $UPDATE_DOWNLOAD_TIMEOUT_S = 60
 
 $TASK_NAME = 'Claude kill-switch'
+# Ставит обновление с правами администратора. Запустить задачу может и обычный пользователь — без окна UAC
+$UPDATE_TASK_NAME = 'Claude kill-switch update'
 $RULE_GROUP = 'Claude kill-switch'
 $POLL_PERIOD_S = 5
 $MENU_REFRESH_PERIOD_MS = 5000
@@ -481,8 +484,12 @@ function Show-Menu {
     })
     # Окно закрываем: установщик в конце откроет его заново, уже новой версии
     $ui.UpdateButton.Add_Click({
-        Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Update"
-        $window.Close()
+        try {
+            Start-ScheduledTask -TaskName $UPDATE_TASK_NAME -ErrorAction Stop
+            $window.Close()
+        } catch {
+            Show-Toast 'Не удалось запустить обновление' 'Скачайте новую версию со страницы проекта на GitHub и запустите install.cmd.' -EvenIfMuted
+        }
     })
     $ui.MinimizeButton.Add_Click({ $window.WindowState = 'Minimized' })
     $ui.CloseButton.Add_Click({ $window.Close() })
@@ -517,22 +524,34 @@ if ($StartInstall) {
     return
 }
 if ($Update) {
-    $updateDir = Join-Path $env:TEMP 'ClaudeKillSwitch-update'
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+        [Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        try { Start-ScheduledTask -TaskName $UPDATE_TASK_NAME -ErrorAction Stop }
+        catch { Show-Toast 'Не удалось запустить обновление' 'Скачайте новую версию со страницы проекта на GitHub и запустите install.cmd.' -EvenIfMuted }
+        return
+    }
+    # Качаем в Program Files: туда без прав администратора не записать, и чужая программа не подменит
+    # скачанный установщик, пока он ждёт запуска (в %TEMP% это было бы возможно)
+    $updateDir = Join-Path $env:ProgramFiles 'ClaudeKillSwitch\update'
     Remove-Item $updateDir -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force $updateDir | Out-Null
     $zipPath = Join-Path $updateDir 'claude-vpn-killswitch.zip'
-    # Окно уже закрыто, а скачивание и окно UAC — не мгновенно: говорим, что работа идёт
-    Show-Toast 'Обновление Claude kill-switch' 'Скачиваю новую версию — потом Windows попросит разрешение на установку.' -EvenIfMuted
+    # Окно уже закрыто, а скачивание — не мгновенно: говорим, что работа идёт
+    Show-Toast 'Обновление Claude kill-switch' 'Скачиваю и устанавливаю новую версию. Потом откроется окно.' -EvenIfMuted
     try {
         Invoke-WebRequest $LATEST_RELEASE_ZIP_URL -OutFile $zipPath -UseBasicParsing -TimeoutSec $UPDATE_DOWNLOAD_TIMEOUT_S
         Expand-Archive $zipPath $updateDir
     } catch {
+        Remove-Item $updateDir -Recurse -Force -ErrorAction SilentlyContinue
         Show-Toast 'Не удалось скачать обновление' 'Проверьте интернет и попробуйте ещё раз.' -EvenIfMuted
         return
     }
-    # В архиве всё лежит в папке claude-vpn-killswitch; install.ps1 сам спросит UAC и откроет окно
+    # В архиве всё лежит в папке claude-vpn-killswitch. Установщик выполняем здесь же: права уже есть, UAC не нужен.
+    # Он перезапустит сторожа (это другая задача) и в конце откроет окно
     $downloadedInstallScriptPath = (Get-ChildItem $updateDir -Recurse -Filter install.ps1 | Select-Object -First 1).FullName
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$downloadedInstallScriptPath`""
+    & $downloadedInstallScriptPath
+    Remove-Item $updateDir -Recurse -Force -ErrorAction SilentlyContinue
     return
 }
 if ($Status) {
