@@ -1,6 +1,6 @@
 {
   "name": "killswitch",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Claude VPN kill-switch для Windows: строка состояния над полем ввода и команда /killswitch (status, menu, install)",
   "author": { "name": "mrnikitavasilenko-del" },
   "homepage": "https://github.com/mrnikitavasilenko-del/claude-vpn-killswitch",
