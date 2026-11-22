@@ -13,7 +13,7 @@ param([switch]$Menu, [switch]$OpenMenu, [switch]$StartInstall, [switch]$Status, 
 
 # Версия = тег релиза на GitHub без «v». Кнопка «Обновить» ставит только релизы. Плагин и /killswitch install
 # берут код из ветки main — поэтому в main только готовое к выпуску
-$VERSION = '0.4.0'
+$VERSION = '0.4.1'
 $GITHUB_REPO = 'mrnikitavasilenko-del/claude-vpn-killswitch'
 $LATEST_RELEASE_API_URL = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
 $LATEST_RELEASE_ZIP_URL = "https://github.com/$GITHUB_REPO/releases/latest/download/claude-vpn-killswitch.zip"
@@ -98,7 +98,9 @@ function Get-ClaudeExePaths {
     $desktopCodeExePaths = @((Get-ChildItem "$env:APPDATA\Claude\claude-code" -Recurse -Depth 3 -Filter *.exe -ErrorAction SilentlyContinue).FullName)
     # Десктоп, установленный как MSIX (Microsoft Store, корпоративная раскатка)
     $storeExePaths = @(Get-AppxPackage -Name '*Claude*' -ErrorAction SilentlyContinue | ForEach-Object {
-        (Get-ChildItem $_.InstallLocation -Recurse -Depth 2 -Filter *.exe -ErrorAction SilentlyContinue).FullName })
+        (Get-ChildItem $_.InstallLocation -Recurse -Depth 2 -Filter *.exe -ErrorAction SilentlyContinue).FullName
+        # MSIX пишет %APPDATA% в свой LocalCache\Roaming: там лежат native host и claude.exe вкладки Code
+        (Get-ChildItem "$env:LOCALAPPDATA\Packages\$($_.PackageFamilyName)\LocalCache\Roaming" -Recurse -Depth 4 -Filter *.exe -ErrorAction SilentlyContinue).FullName })
     @($cliExePaths + $desktopExePaths + $desktopCodeExePaths + $storeExePaths | Where-Object { $_ -and (Test-Path $_) } | Sort-Object)
 }
 
