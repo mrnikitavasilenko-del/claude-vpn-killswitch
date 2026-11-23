@@ -13,7 +13,7 @@ param([switch]$Menu, [switch]$OpenMenu, [switch]$StartInstall, [switch]$Status, 
 
 # Версия = тег релиза на GitHub без «v». Кнопка «Обновить» ставит только релизы. Плагин и /killswitch install
 # берут код из ветки main — поэтому в main только готовое к выпуску
-$VERSION = '0.4.2'
+$VERSION = '0.4.3'
 $GITHUB_REPO = 'mrnikitavasilenko-del/claude-vpn-killswitch'
 $LATEST_RELEASE_API_URL = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
 $LATEST_RELEASE_ZIP_URL = "https://github.com/$GITHUB_REPO/releases/latest/download/claude-vpn-killswitch.zip"
@@ -37,6 +37,8 @@ $BLOCKED_TOAST_COOLDOWN_S = 60
 # Событие 5157 «WFP заблокировала подключение»; %%14593 — исходящее. Пишется, если установщик включил аудит
 $BLOCKED_CONNECTION_EVENT_ID = 5157
 $OUTBOUND_DIRECTION = '%%14593'
+# IPv4 мультикаст 224.0.0.0/4, широковещание, IPv6 мультикаст ff00::/8
+$LOCAL_ONLY_DESTINATION_PATTERN = '^(22[4-9]|23\d)\.|^255\.255\.255\.255$|^ff[0-9a-f]{2}:'
 # Адаптеры VPN-клиентов узнаём по описанию драйвера. Адаптер неизвестного VPN попадёт под блок:
 # Claude через него работать не будет, но и мимо VPN не уйдёт
 $TUNNEL_ADAPTER_DESCRIPTION_PATTERN = 'Tunnel|Wintun|WireGuard|Amnezia|TAP-Win|OpenVPN|Happ|sing-box|AnyConnect|Fortinet'
@@ -653,6 +655,9 @@ while ($true) {
             $claudeExePathsWithoutDrive = @($claudeExePaths | ForEach-Object { $_.Substring(2).ToLower() })
             $blockedClaudeConnection = $newOutboundBlocks | Where-Object {
                 $blockedAppPath = "$($_.Properties[1].Value)".ToLower()
+                # Мультикаст и широковещание (mDNS 224.0.0.251 / ff02::fb от Chromium) не покидают локальную сеть
+                # и в туннель уйти не могут — блок правильный, но уведомлять не о чем
+                "$($_.Properties[5].Value)" -notmatch $LOCAL_ONLY_DESTINATION_PATTERN -and
                 @($claudeExePathsWithoutDrive | Where-Object { $blockedAppPath.EndsWith($_) }).Count -gt 0
             } | Select-Object -First 1
             $isBlockedToastCooledDown = ((Get-Date) - $lastBlockedToastTime).TotalSeconds -ge $BLOCKED_TOAST_COOLDOWN_S

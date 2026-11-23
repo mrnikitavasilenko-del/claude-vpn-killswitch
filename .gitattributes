@@ -2,3 +2,5 @@
 *.cmd text eol=crlf
 # Скриншоты и SECURITY.md нужны странице на GitHub, а не программе — в архив релиза не кладём
 .github export-ignore
+# Инструкции для Claude Code — в архив релиза не кладём
+CLAUDE.md export-ignore
